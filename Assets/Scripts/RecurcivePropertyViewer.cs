@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
-using System.Reflection;
+using UnityEngine;
 public class RecurcivePropertyViewer
 {
-
+    
     //これを使って呼び出す
     public static string ViewLogMain(object obj)
     {
@@ -12,101 +12,80 @@ public class RecurcivePropertyViewer
         {
             objList.Add(obj);
         }
-        return obj.GetType().ToString() + ":" + ViewLog(obj,ref objList);
+        string blank = "        ";
+        return obj.GetType().ToString() + ":{\n" + ViewLog(obj,ref objList,blank) + "}";
     }
 
     //機能の実態
     //受け取ったobjのフィールドの配列でループを回し
     //それぞれの値を取得して、場合によっては再帰をかけたい
-    private static string ViewLog(object obj,ref List<object> objList)
+    private static string ViewLog(object obj,ref List<object> objList,string blank)
     {
         string log = "";
-        System.Type type = obj.GetType();
-
-        var properties = type.GetProperties();
-
-
+        var properties = obj.GetType().GetProperties();
         if(properties == null)//このobjectがフィールドを持ってないならループせずに再帰終了
         {
-            return "";
+            return "null";
         }
         foreach (var property in properties)
         {
             try
             {
-                var propertyObj = property.GetValue(obj);
-                string result = GetResult(propertyObj,ref objList);
-                log += property.Name + ":" + result + ",";
-            }
-            catch (System.Exception e)
-            {
-                 //log = field.Name + ":" + e.ToString() + ",";
-            }
+                log += blank + property.Name + ":" + GetResult(property.GetValue(obj), ref objList,blank) + ",\n";
+            }catch (System.Exception){}
         }
         return log;
     }
-
-
-    //再帰するときに毎回この処理したいなって思ったけどきもい
-    public static string GetNestViewLog(object nestObj, ref List<object> objList)
-    {
-        return GetNestLog(ViewLog(nestObj, ref objList));
-    }
-    
-    
-    
-    public static string GetResult(object obj,ref List<object> objList)
+       
+    public static string GetResult(object obj,ref List<object> objList,string blank)
     {
         try
         {
+            var type = obj.GetType();
             if (obj == null)//objがnullならnull
             {
                 return "null";
             }
-            if (IsPrimitive(obj))//単純型ならどうする
+            if (type.IsPrimitive)//単純型ならどうする
+            {
+                //return obj.ToString();
+                return obj.ToString();
+            }
+            if (type.IsEnum)
             {
                 return obj.ToString();
             }
+            if (type.IsValueType)//構造体はToStringしとく
+            {
+                if(type == typeof(Matrix4x4))
+                {
+                    return "行列インデントやだ";
+                }
+                return obj.ToString();
+            }
+            if(type == typeof(string))//stringならそのまま返す
+            {
+                return (string)obj;
+            }
             if (IsExistProperty(obj, objList))//循環参照があったらどうする
             {
-                return "zyunkan";
+                return "もう見た";
             }
-            if (!obj.GetType().IsValueType)//値型じゃないならリストに保存
+            objList.Add(obj);
+            if (type.IsArray)
             {
-                objList.Add(obj);
+
             }
-            return GetNestViewLog(obj, ref objList);
-            return "sonota";
-        }
-        catch (System.Exception e)
-        {
-            return e.ToString();
-        }
+            
+            return "{\n" + ViewLog(obj, ref objList,blank + "        ") + blank + "}";
+        }catch (System.Exception){ return ""; }
     }
 
-    //自己参照型および相互参照型の定義はプリミティブ型にのみ許された行為らしい
-    //いれたobjがプリミティブかどうか判定
-    public static bool IsPrimitive(object obj)
-    {
-        return obj.GetType().IsPrimitive;
-    }
-
+    
     //そのリストにそのobjが含まれてるかどうか
     public static bool IsExistProperty(object obj, List<object> list)
     {
         return list.Exists(youso => youso == obj);
     }
 
-    //ネストするときは改行して中括弧つけたいなって思った
-    public static string GetNestLog(string nestLog)
-    {
-        if (nestLog != "")
-        {
-            return "{" + nestLog + "}";
-        }
-        else
-        {
-            return "null";
-        }
-    }
 }
